@@ -1,43 +1,47 @@
-# MIUI/HyperOS Auto Unlock Sniper 🎯
+# MIUI Auto Unlock
 
-Um bot metralhadora assíncrono projetado para contornar o caótico sistema de cotas diárias de desbloqueio de Bootloader da Xiaomi (MIUI/HyperOS).
-
-## O Problema
-A Xiaomi liberou um sistema de cota na MIUI Community Global. A vaga zera exatamente às **00:00:00 (Horário de Pequim)**. No entanto, por causa de milhões de bots mundialmente:
-1. Se você enviar sua requisição 1 milissegundo depois, a cota já esgotou.
-2. O servidor sofre um colapso (DDoS natural) à meia-noite, causando lentidão e rejeitando handshakes TLS. Scripts comuns que enviam a requisição exato na meia-noite acabam sofrendo de Timeouts e perdem a vaga.
-
-## A Solução (Como este script domina o servidor)
-Este bot utiliza três artifícios técnicos letais para garantir a vaga:
-1. **NTP Timeshift Compensation (Compensação de Ping)**: O script sincroniza milimetricamente com os servidores NTP e mede o atraso de rede (ping) em relação à China (geralmente ~351ms). A requisição é disparada com o tempo *adiantado*, fazendo com que os dados pousem no servidor da Xiaomi em exatos `00:00:00.000`.
-2. **TLS Pre-Warm (Pré-Aquecimento de Túnel)**: O maior gargalo não é o ping, mas sim o *Handshake TLS* (Aperto de mão de criptografia) que consome ~1 segundo na primeira requisição e trava o script no horário de pico. Esse script resolve isso conectando silenciosamente ao servidor **10 segundos antes** da meia-noite, abrindo e mantendo "vivas" dezenas de conexões.
-3. **Metralhadora Multithread**: No exato milissegundo planejado, o script libera 50 threads que descarregam dezenas de requisições através dos túneis abertos sem a necessidade de negociar o TLS, atropelando o servidor imune a lags síncronos.
+Script em Python para automatizar a solicitação de desbloqueio do Bootloader na Xiaomi Community (MIUI/HyperOS).
+O script roda de forma automática, contornando o limite diário de vagas que reseta às 00:00:00 (horário de Pequim). Ele lida automaticamente com compensação de ping e abre múltiplas threads para não perder a janela de tempo.
 
 ## Requisitos
-- Linux (testado em distribuições rodando `systemd`)
+- Linux (Systemd)
 - Python 3.x
-- Firefox / Chrome (para captura do token)
+- Navegador logado na Xiaomi Community Global para pegar o token
 
 ## Instalação
-1. Clone este repositório no seu computador:
+
+1. Clone o repositório no seu computador:
    ```bash
-   git clone https://github.com/SEU_USUARIO/miui-auto-unlock.git ~/Desbloqueio_MIUI
+   git clone https://github.com/SEU_USUARIO/miui-auto-unlock.git ~/Github/Pessoal/Mi-comunnity_desbloqueador
    ```
-2. Instale as bibliotecas Python se necessário (o script auto-instala se você rodá-lo, mas garanta que pip está instalado).
-3. O `timeshift.txt` vem configurado com `351.0` ms por padrão, ajuste se souber o ping exato do seu servidor.
+2. O script instala as dependências Python automaticamente (requests, ntplib, pytz, urllib3) caso você não as tenha.
 
 ## Como Usar
 
-### 1. Pegando o seu Token
-Você precisa copiar o token `new_bbs_serviceToken` da comunidade Xiaomi global para o arquivo `token.txt`.
-- Acesse `https://new-ams.c.mi.com/global` pelo navegador (no PC ou celular).
-- Faça login na conta.
-- Abra o painel de desenvolvedor (F12) > Storage > Cookies.
-- Copie o valor do cookie `new_bbs_serviceToken` e cole dentro do arquivo `token.txt`. 
+### 1. Obtendo o Token de Sessão
+Para que o script funcione, ele precisa estar autenticado na sua conta.
+1. Acesse o site oficial: `https://new-ams.c.mi.com/global` e faça o login.
+2. Abra as Ferramentas de Desenvolvedor (F12) no navegador.
+3. Vá na aba **Storage** (Armazenamento) > **Cookies**.
+4. Procure pelo cookie chamado `new_bbs_serviceToken`.
+5. Copie o valor desse cookie e cole-o dentro do arquivo `token.txt` na pasta do script, substituindo o texto `COLE_SEU_TOKEN_AQUI`.
 
-### 2. Automatizando com o Sistema (Recomendado)
-O bot funciona melhor se você configurá-lo como um Serviço nativo do Sistema para que ele rode 100% autônomo.
-Crie um serviço de usuário do systemd em `~/.config/systemd/user/miui-unlock.service` com o seguinte conteúdo (Lembre de trocar o caminho se não estiver em Desbloqueio_MIUI):
+*(Nota: O token costuma expirar em cerca de 24 horas, portanto é recomendado atualizar o token diariamente antes da meia-noite da China - 13:00 no horário de Brasília).*
+
+### 2. Configurando o Timeshift
+O arquivo `timeshift.txt` serve para compensar o seu Ping (latência) de comunicação até a China, disparando o script um pouco antes para que ele chegue no servidor no milissegundo exato.
+O valor padrão que deixamos é `351.0` (em milissegundos). Você pode alterar esse arquivo se souber o ping exato do seu servidor, mas o padrão costuma funcionar bem para conexões normais.
+
+### 3. Rodando o Script
+
+Você pode rodar manualmente:
+```bash
+python3 auto_unlock.py
+```
+
+Ou, para não precisar deixar o terminal aberto, recomendo configurar o script como um serviço do sistema para rodar em segundo plano:
+
+1. Crie o arquivo de serviço em `~/.config/systemd/user/miui-unlock.service` com o conteúdo abaixo:
 
 ```ini
 [Unit]
@@ -45,21 +49,22 @@ Description=MIUI Auto Unlock Script
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -u %h/Desbloqueio_MIUI/auto_unlock.py
+ExecStart=/usr/bin/python3 -u %h/Github/Pessoal/Mi-comunnity_desbloqueador/auto_unlock.py
 Restart=on-failure
 RestartSec=60
 
 [Install]
 WantedBy=default.target
 ```
-Rode os seguintes comandos para ativá-lo:
+
+2. Ative e inicie o serviço:
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now miui-unlock.service
 ```
 
-### 3. Lembretes (Opcional)
-Se precisar ser lembrado todo dia às 12:00 de colocar um token novo, inclua um Timer Systemd apontando para o arquivo `lembrete.sh`.
+O script ficará dormindo e aguardará o horário correto para disparar. Sempre que você colocar um token novo no `token.txt`, basta rodar `systemctl --user restart miui-unlock.service` para recarregar.
 
-## Aviso Legal
-Esta ferramenta tem propósitos de pesquisa educacional para análise de tráfego assíncrono. Não me responsabilizo por proibições da conta efetuadas pela própria fabricante.
+---
+**Aviso Legal:**
+Esta ferramenta foi feita para uso e estudo próprio. Não há garantias de funcionamento devido a mudanças constantes nos servidores da Xiaomi. Use por sua conta e risco.
