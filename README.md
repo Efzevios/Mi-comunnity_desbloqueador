@@ -1,5 +1,6 @@
-# MIUI Auto Unlock
+[Português](README.md) | [English](README-en.md) | [Español](README-es.md)
 
+# MIUI Auto Unlock
 Script em Python para automatizar a solicitação de desbloqueio do Bootloader na Xiaomi Community (MIUI/HyperOS).
 O script roda de forma automática, contornando o limite diário de vagas que reseta às 00:00:00 (horário de Pequim). Ele lida automaticamente com compensação de ping e abre múltiplas threads para não perder a janela de tempo.
 
